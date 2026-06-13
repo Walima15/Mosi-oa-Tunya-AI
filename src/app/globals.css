@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────
+   Mosi-oa-Tunya AI — Design Tokens
+   "The Smoke That Thunders" · Luxury African Fintech
+   ────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Brand palette */
+  --color-midnight: #071a35;
+  --color-midnight-50: #f2f5fa;
+  --color-midnight-100: #d9e2ef;
+  --color-midnight-200: #b3c4df;
+  --color-midnight-300: #7d97bf;
+  --color-midnight-400: #3f5d8f;
+  --color-midnight-500: #1d3963;
+  --color-midnight-600: #122a4d;
+  --color-midnight-700: #0c2143;
+  --color-midnight-800: #091d3b;
+  --color-midnight-900: #071a35;
+  --color-midnight-950: #04101f;
+
+  --color-gold: #d4af37;
+  --color-gold-light: #e9cd6a;
+  --color-gold-dark: #a8862a;
+
+  --color-cyan-accent: #00d4ff;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+
+  /* Semantic tokens (dark-first) */
+  --color-background: #04101f;
+  --color-surface: #071a35;
+  --color-surface-2: #0c2143;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-foreground: #f5f8ff;
+  --color-muted: #8aa0c2;
+
+  /* Typography */
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-heading), var(--font-body), sans-serif;
+
+  /* Radius */
+  --radius-card: 1.25rem;
+
+  /* Motion */
+  --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-midnight-900);
+  }
+
+  /* Premium thin scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.25);
+    border-radius: 99px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(212, 175, 55, 0.45);
+    background-clip: content-box;
+  }
+}
+
+@layer utilities {
+  /* Glassmorphism card */
+  .glass {
+    background: linear-gradient(
+      160deg,
+      rgba(12, 33, 67, 0.72) 0%,
+      rgba(7, 26, 53, 0.55) 100%
+    );
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-strong {
+    background: linear-gradient(
+      160deg,
+      rgba(12, 33, 67, 0.92) 0%,
+      rgba(7, 26, 53, 0.85) 100%
+    );
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Gold gradient text */
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #f3dd8f 0%, #d4af37 45%, #a8862a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .text-gradient-water {
+    background: linear-gradient(120deg, #ffffff 0%, #00d4ff 55%, #3f5d8f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .bg-aurora {
+    background:
+      radial-gradient(60% 60% at 15% 10%, rgba(0, 212, 255, 0.16) 0%, transparent 60%),
+      radial-gradient(50% 50% at 85% 0%, rgba(212, 175, 55, 0.14) 0%, transparent 55%),
+      radial-gradient(80% 80% at 50% 120%, rgba(29, 57, 99, 0.5) 0%, transparent 60%),
+      var(--color-background);
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.2),
+      0 12px 40px -12px rgba(212, 175, 55, 0.45);
+  }
+  .glow-cyan {
+    box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.2),
+      0 12px 40px -12px rgba(0, 212, 255, 0.45);
+  }
+
+  /* Flowing falls shimmer */
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 6s linear infinite;
+  }
+
+  .animate-float {
+    animation: float 7s var(--ease-flow) infinite;
+  }
+
+  .animate-flow {
+    animation: flow 12s linear infinite;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  80%, 100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
