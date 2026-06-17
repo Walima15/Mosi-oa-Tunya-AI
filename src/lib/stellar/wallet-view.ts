@@ -4,7 +4,7 @@
  * SERVER-ONLY.
  */
 import { getAccountSnapshot, type AccountSnapshot } from "@/lib/stellar/account";
-import { getStellarPublicKey, hasConfiguredStellarAccount } from "@/lib/stellar/public-key";
+import { getStellarPublicKey } from "@/lib/stellar/public-key";
 import { getNetworkStatus, STELLAR } from "@/lib/stellar/client";
 import { explorerAccountUrl } from "@/lib/stellar/explorer";
 import { demoStellarWallet } from "@/lib/stellar-demo";
@@ -39,7 +39,6 @@ function snapshotToView(snapshot: AccountSnapshot, configured: boolean): Stellar
 
 /** Load wallet for the configured account, or fall back to demo simulation. */
 export async function loadWalletView(): Promise<StellarWalletView> {
-  const configured = hasConfiguredStellarAccount();
   const publicKey = getStellarPublicKey();
 
   if (publicKey) {
