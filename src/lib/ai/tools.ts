@@ -20,7 +20,17 @@ export type ToolName =
   | "create_savings_goal"
   | "summarize_spending"
   | "estimate_fee"
-  | "explain_transaction";
+  | "explain_transaction"
+  // Stellar-native tools
+  | "create_stellar_wallet"
+  | "create_family_wallet"
+  | "create_goal_vault"
+  | "create_split_payment"
+  | "create_path_payment"
+  | "create_stellar_automation"
+  | "explain_stellar_transaction"
+  | "summarize_family_finance"
+  | "generate_financial_plan";
 
 /** A single labelled line inside an action card preview. */
 export interface ActionField {
@@ -34,6 +44,15 @@ export interface ActionField {
  * `requiresConfirmation` so the UI shows a confirmation modal / preview before
  * calling the execution endpoint.
  */
+/** A destination row in a split-payment preview. */
+export interface SplitPreviewItem {
+  label: string;
+  amount: number;
+  percentage?: number;
+  memo: string;
+  destinationType?: "member" | "vault" | "bill" | "school";
+}
+
 export interface ActionCard {
   tool: ToolName;
   title: string;
@@ -45,7 +64,25 @@ export interface ActionCard {
   executeEndpoint?: string;
   /** Validated payload passed to the execution endpoint. */
   payload?: Record<string, unknown>;
-  intent?: "transfer" | "automation" | "alert" | "savings" | "insight";
+  intent?:
+    | "transfer"
+    | "automation"
+    | "alert"
+    | "savings"
+    | "insight"
+    | "stellar_wallet"
+    | "family"
+    | "vault"
+    | "split"
+    | "path"
+    | "plan";
+  /** Stellar-native presentation hints (rendered as chips on the card). */
+  stellar?: boolean;
+  network?: string;
+  memo?: string;
+  asset?: string;
+  /** Multi-destination breakdown (split payments / family plans). */
+  items?: SplitPreviewItem[];
 }
 
 const currency = z.enum(["USD", "ZMW", "ZAR", "BWP", "KES", "TZS"]);
@@ -303,3 +340,293 @@ export const toolBuilders = {
   create_savings_goal: buildSavingsGoalCard,
   estimate_fee: buildFeeEstimateCard,
 } as const;
+
+/* ══════════════════════════════════════════════════════════════
+   STELLAR-NATIVE TOOLS
+   Every money-moving Stellar tool returns a confirmable ActionCard.
+   ══════════════════════════════════════════════════════════════ */
+
+const NETWORK = (process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet") === "public" ? "Public" : "Testnet";
+const ASSET = process.env.NEXT_PUBLIC_SETTLEMENT_ASSET ?? "USDC";
+
+export const stellarToolSchemas = {
+  create_stellar_wallet: z.object({
+    network: z.enum(["testnet", "public"]).default("testnet"),
+    fund: z.boolean().default(true),
+  }),
+  create_family_wallet: z.object({
+    name: z.string().default("My Family"),
+    base_currency: currency.default("ZMW"),
+    members: z
+      .array(
+        z.object({
+          full_name: z.string(),
+          relation: z.enum(["parent", "child", "spouse", "sibling", "dependent", "other"]),
+          monthly_support: z.number().optional(),
+        })
+      )
+      .optional(),
+  }),
+  create_goal_vault: z.object({
+    name: z.string(),
+    vault_type: z.enum(["house", "education", "emergency", "retirement", "school_fees", "general"]).default("general"),
+    target_amount: z.number().positive(),
+    currency: currency.default("ZMW"),
+    monthly_contribution: z.number().optional(),
+    target_date: z.string().optional(),
+  }),
+  create_split_payment: z.object({
+    total: z.number().positive(),
+    currency: currency.default("USD"),
+    items: z.array(
+      z.object({
+        label: z.string(),
+        percentage: z.number().optional(),
+        amount: z.number().optional(),
+        memo: z.string().optional(),
+        destination_type: z.enum(["member", "vault", "bill", "school"]).default("member"),
+      })
+    ),
+  }),
+  create_path_payment: z.object({
+    send_asset: z.string().default("USD"),
+    send_amount: z.number().positive(),
+    dest_asset: z.string().default("ZMW"),
+    target_rate: z.number().optional(),
+  }),
+  create_stellar_automation: z.object({
+    description: z.string(),
+    trigger_kind: z.enum(["schedule", "condition"]),
+    action_kind: z.enum(["transfer", "save", "convert", "pay_bill"]),
+    amount: z.number().optional(),
+    percentage: z.number().optional(),
+    currency: currency.optional(),
+    memo_tag: z.string().optional(),
+  }),
+  generate_financial_plan: z.object({
+    total: z.number().positive().default(7500),
+    currency: currency.default("ZMW"),
+  }),
+} as const;
+
+export const stellarToolDefinitions = [
+  { name: "create_stellar_wallet", description: "Create a real Stellar wallet (keypair) for the user and fund it on testnet." },
+  { name: "create_family_wallet", description: "Create a Stellar-backed Family Wallet with members and allocations." },
+  { name: "create_goal_vault", description: "Create a Stellar Goal Vault for a savings target (house, education, emergency…)." },
+  { name: "create_split_payment", description: "Split one remittance across multiple Stellar destinations (family, vaults, bills)." },
+  { name: "create_path_payment", description: "Convert currency using a Stellar path payment for the best FX route." },
+  { name: "create_stellar_automation", description: "Create a Stellar-executed automation rule (recurring transfer, save %, convert at rate)." },
+  { name: "explain_stellar_transaction", description: "Explain a Stellar transaction: hash, asset, memo, fee, status." },
+  { name: "summarize_family_finance", description: "Summarise family support and savings over a period." },
+  { name: "generate_financial_plan", description: "Generate a full monthly family finance plan with Stellar allocations." },
+] as const;
+
+const baseStellar = { stellar: true as const, network: NETWORK, asset: ASSET };
+
+export function buildStellarWalletCard(
+  args: z.infer<typeof stellarToolSchemas.create_stellar_wallet>
+): ActionCard {
+  return {
+    ...baseStellar,
+    tool: "create_stellar_wallet",
+    intent: "stellar_wallet",
+    title: "Create your Stellar wallet",
+    summary: "A real Stellar account secured for you",
+    requiresConfirmation: true,
+    confirmLabel: "Create Stellar wallet",
+    executeEndpoint: "/api/stellar/wallet",
+    payload: { ...args },
+    fields: [
+      { label: "Network", value: NETWORK, emphasis: true },
+      { label: "Assets", value: `XLM + ${ASSET}` },
+      { label: "Trustline", value: `${ASSET} (auto)` },
+      { label: "Funding", value: args.fund ? "Friendbot test XLM" : "Manual" },
+      { label: "Secret key", value: "Encrypted server-side · never shared" },
+    ],
+  };
+}
+
+export function buildFamilyWalletCard(
+  args: z.infer<typeof stellarToolSchemas.create_family_wallet>
+): ActionCard {
+  const members = args.members ?? [
+    { full_name: "Grace Mwila", relation: "parent", monthly_support: 5000 },
+    { full_name: "Joseph Mwila", relation: "parent", monthly_support: 3000 },
+    { full_name: "Natasha Mwila", relation: "child", monthly_support: 2500 },
+  ];
+  const total = members.reduce((s, m) => s + (m.monthly_support ?? 0), 0);
+  return {
+    ...baseStellar,
+    tool: "create_family_wallet",
+    intent: "family",
+    title: "Create Family Wallet",
+    summary: `${args.name} · ${members.length} members on Stellar`,
+    requiresConfirmation: true,
+    confirmLabel: "Create Family Wallet",
+    executeEndpoint: "/api/family-wallet",
+    payload: { ...args, members },
+    fields: [
+      { label: "Family", value: args.name, emphasis: true },
+      { label: "Members", value: String(members.length) },
+      { label: "Monthly support", value: `${args.base_currency} ${total.toLocaleString()}`, emphasis: true },
+      { label: "Each member", value: "Mapped Stellar destination + memo" },
+    ],
+    items: members.map((m) => ({
+      label: `${m.full_name} (${m.relation})`,
+      amount: m.monthly_support ?? 0,
+      memo: `FAMILY_SUPPORT_${m.relation.toUpperCase()}`,
+      destinationType: "member" as const,
+    })),
+  };
+}
+
+export function buildGoalVaultCard(
+  args: z.infer<typeof stellarToolSchemas.create_goal_vault>
+): ActionCard {
+  const fields: ActionField[] = [
+    { label: "Vault", value: args.name, emphasis: true },
+    { label: "Type", value: args.vault_type.replace("_", " ") },
+    { label: "Target", value: `${args.currency} ${args.target_amount.toLocaleString()}`, emphasis: true },
+  ];
+  if (args.monthly_contribution) {
+    fields.push({ label: "Monthly", value: `${args.currency} ${args.monthly_contribution.toLocaleString()}` });
+    const months = Math.ceil(args.target_amount / args.monthly_contribution);
+    fields.push({ label: "Forecast", value: `~${months} months to target` });
+  }
+  if (args.target_date) fields.push({ label: "By", value: args.target_date });
+  fields.push({ label: "Backed by", value: `Stellar vault account` });
+  return {
+    ...baseStellar,
+    tool: "create_goal_vault",
+    intent: "vault",
+    title: "Create Stellar Goal Vault",
+    summary: "A Stellar-backed vault for your goal",
+    requiresConfirmation: true,
+    confirmLabel: "Create vault",
+    executeEndpoint: "/api/goal-vaults",
+    payload: { ...args },
+    memo: "VAULT_DEPOSIT",
+    fields,
+  };
+}
+
+export function buildSplitPaymentCard(
+  args: z.infer<typeof stellarToolSchemas.create_split_payment>
+): ActionCard {
+  const items: SplitPreviewItem[] = args.items.map((it) => ({
+    label: it.label,
+    percentage: it.percentage,
+    amount: it.amount ?? +(((it.percentage ?? 0) / 100) * args.total).toFixed(2),
+    memo: it.memo ?? "FAMILY_SUPPORT",
+    destinationType: it.destination_type,
+  }));
+  return {
+    ...baseStellar,
+    tool: "create_split_payment",
+    intent: "split",
+    title: "Confirm Stellar split payment",
+    summary: `Split ${args.currency} ${args.total.toLocaleString()} across ${items.length} Stellar destinations`,
+    requiresConfirmation: true,
+    confirmLabel: `Send & split ${args.currency} ${args.total.toLocaleString()}`,
+    executeEndpoint: "/api/split-payments",
+    payload: { ...args },
+    fields: [
+      { label: "Total", value: `${args.currency} ${args.total.toLocaleString()}`, emphasis: true },
+      { label: "Destinations", value: String(items.length) },
+      { label: "Settlement", value: `Stellar ${ASSET}` },
+      { label: "Last-mile", value: "Mobile money payout" },
+    ],
+    items,
+  };
+}
+
+export function buildPathPaymentCard(
+  args: z.infer<typeof stellarToolSchemas.create_path_payment>
+): ActionCard {
+  const requiresConfirmation = !args.target_rate; // immediate convert needs confirm; alert is informational
+  return {
+    ...baseStellar,
+    tool: "create_path_payment",
+    intent: "path",
+    title: args.target_rate ? "Set FX target (Stellar path)" : "Convert via Stellar path payment",
+    summary: `${args.send_asset} → ${args.dest_asset} on Stellar's order book`,
+    requiresConfirmation,
+    confirmLabel: args.target_rate ? "Set FX alert" : "Convert now",
+    executeEndpoint: args.target_rate ? "/api/fx-optimizer" : "/api/fx-optimizer/convert",
+    payload: { ...args },
+    memo: "FX_CONVERSION",
+    fields: [
+      { label: "Send", value: `${args.send_amount.toLocaleString()} ${args.send_asset}`, emphasis: true },
+      { label: "Receive", value: args.dest_asset, },
+      { label: "Route", value: `${args.send_asset} → ${ASSET} → ${args.dest_asset}` },
+      ...(args.target_rate ? [{ label: "Target rate", value: String(args.target_rate) }] : []),
+    ],
+  };
+}
+
+export function buildStellarAutomationCard(
+  args: z.infer<typeof stellarToolSchemas.create_stellar_automation>
+): ActionCard {
+  const fields: ActionField[] = [
+    { label: "Rule", value: args.description, emphasis: true },
+    { label: "Trigger", value: args.trigger_kind },
+    { label: "Action", value: args.action_kind.replace("_", " ") },
+    { label: "Executes on", value: "Stellar" },
+  ];
+  if (args.amount) fields.push({ label: "Amount", value: `${args.currency ?? "ZMW"} ${args.amount.toLocaleString()}` });
+  if (args.percentage) fields.push({ label: "Percentage", value: `${args.percentage}%` });
+  if (args.memo_tag) fields.push({ label: "Memo", value: args.memo_tag });
+  return {
+    ...baseStellar,
+    tool: "create_stellar_automation",
+    intent: "automation",
+    title: "Create Stellar automation",
+    summary: "Programmable money movement on Stellar",
+    requiresConfirmation: true,
+    confirmLabel: "Activate automation",
+    executeEndpoint: "/api/automations",
+    payload: { ...args },
+    memo: args.memo_tag,
+    fields,
+  };
+}
+
+export function buildFamilyPlanCard(
+  total: number,
+  currency: CurrencyCode,
+  allocations: { label: string; amount: number; memo: string; percentage?: number; destinationType?: SplitPreviewItem["destinationType"] }[]
+): ActionCard {
+  return {
+    ...baseStellar,
+    tool: "generate_financial_plan",
+    intent: "plan",
+    title: "Confirm family finance plan",
+    summary: `Allocate ${currency} ${total.toLocaleString()} across family & Stellar vaults`,
+    requiresConfirmation: true,
+    confirmLabel: `Execute plan · ${currency} ${total.toLocaleString()}`,
+    executeEndpoint: "/api/split-payments",
+    payload: {
+      total,
+      currency,
+      items: allocations.map((a) => ({
+        label: a.label,
+        amount: a.amount,
+        memo: a.memo,
+        destination_type: a.destinationType ?? "member",
+      })),
+    },
+    fields: [
+      { label: "Total", value: `${currency} ${total.toLocaleString()}`, emphasis: true },
+      { label: "Legs", value: String(allocations.length) },
+      { label: "Settlement", value: `Stellar ${ASSET}` },
+      { label: "Payout", value: "Mobile money (last-mile)" },
+    ],
+    items: allocations.map((a) => ({
+      label: a.label,
+      amount: a.amount,
+      percentage: a.percentage,
+      memo: a.memo,
+      destinationType: a.destinationType,
+    })),
+  };
+}

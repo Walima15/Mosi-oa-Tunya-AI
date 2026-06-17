@@ -18,8 +18,15 @@ import {
   buildAutomationCard,
   buildRateAlertCard,
   buildSavingsGoalCard,
+  buildStellarWalletCard,
+  buildFamilyWalletCard,
+  buildGoalVaultCard,
+  buildSplitPaymentCard,
+  buildPathPaymentCard,
+  buildFamilyPlanCard,
   type ActionCard,
 } from "@/lib/ai/tools";
+import { generateMonthlyFamilyPlan, looksLikeFamilyPlan } from "@/lib/services/family-finance";
 
 export interface AgentContext {
   userId: string;
@@ -40,27 +47,27 @@ export interface AgentResponse {
   memoriesExtracted?: { key: string; value: string; category: string }[];
 }
 
-const SYSTEM_PROMPT = `You are Mosi, the AI financial agent for Mosi-oa-Tunya AI — Africa's cross-border financial operating system.
+const SYSTEM_PROMPT = `You are Mosi, the AI financial agent for Mosi-oa-Tunya AI — Africa's first autonomous family finance agent powered by Stellar.
 
 Your personality: warm, knowledgeable, concise, and action-oriented. You speak like a trusted personal financial manager, not a bank chatbot.
 
-Capabilities you can help with:
-- Cross-border money transfers (USD, ZMW, ZAR, BWP, KES, TZS)
-- Recurring family support and automations
-- Savings goals and forecasting
-- Exchange rate monitoring and conversion
-- School fee payments
-- Bill payments (electricity, water, internet, TV)
-- Investment guidance (bonds, T-bills, agriculture, real estate, SMEs)
-- Family budgeting and spending insights
+Stellar is your financial backbone. Value moves as stablecoin over the Stellar network; mobile money (Airtel, MTN, Zamtel) is only the last-mile payout. You organize money using Stellar wallets, Family Wallets, Goal Vaults, split payments and path payments.
 
-When the user asks you to DO something (send money, create automation, save, etc.), confirm the details and tell them what you will set up. Be specific with amounts, dates, and beneficiaries.
+Capabilities:
+- Create a real Stellar wallet for the user
+- Create a Stellar Family Wallet (mother, father, child, dependents) with mapped Stellar destinations
+- Create Stellar Goal Vaults (house, education, emergency, retirement, school fees)
+- Split one remittance across many Stellar destinations (e.g. 60% mother, 20% school, 10% emergency, 10% house)
+- Optimize FX using Stellar path payments and rate alerts
+- Programmable Stellar automations (save 10% of every transfer, monthly support, convert at target rate)
+- Tag every transfer with a Stellar memo describing its purpose (FAMILY_SUPPORT_MOTHER, SCHOOL_FEES, HOUSE_FUND_DEPOSIT, EMERGENCY_RESERVE)
+- Family budgeting, spending insights, affordability analysis
 
-When asked analytical questions (affordability, spending analysis), use the user's financial context to give data-driven answers.
+When the user asks you to DO something, build a clear plan and present it for confirmation. NEVER move money without explicit user confirmation — you propose a confirmable ActionCard, the user confirms, and only then does Stellar execute.
 
-Keep responses under 200 words unless the user asks for detail. Use the user's preferred currency when quoting amounts.
+Keep responses under 200 words unless asked for detail. Use the user's preferred currency when quoting amounts.
 
-Remember: you are NOT a licensed financial advisor. For investment decisions, recommend they review official prospectuses.`;
+You are NOT a licensed financial advisor. For investments, recommend reviewing official prospectuses.`;
 
 /** Demo responses keyed by intent keywords. */
 const DEMO_RESPONSES: { match: RegExp; response: AgentResponse }[] = [
@@ -180,6 +187,121 @@ const DEMO_RESPONSES: { match: RegExp; response: AgentResponse }[] = [
   },
 ];
 
+/**
+ * Recognise Stellar-native intents and return a full agent response with a
+ * confirmable ActionCard. This powers the judge-facing demo.
+ */
+function tryStellarIntent(message: string): AgentResponse | null {
+  // 1. "Take care of my family's finances" → full family plan
+  if (looksLikeFamilyPlan(message)) {
+    const plan = generateMonthlyFamilyPlan(7500, "ZMW");
+    return {
+      message:
+        "Here's a complete family finance plan for this month. I'll settle everything over Stellar — family support goes out as stablecoin and lands in mobile money, while savings flow into your Stellar Goal Vaults. Review and confirm and I'll execute it.",
+      actionCard: buildFamilyPlanCard(
+        plan.total,
+        plan.currency,
+        plan.allocations.map((a) => ({
+          label: a.label,
+          amount: a.amount,
+          memo: a.memo,
+          percentage: a.percentage,
+          destinationType: a.destinationType,
+        }))
+      ),
+      suggestedActions: [
+        { label: "Adjust amounts", action: "edit_plan" },
+        { label: "Add a family member", action: "add_member" },
+      ],
+    };
+  }
+
+  // 2. Split payment
+  if (/split|divide|share.*between|60%|allocate.*between/i.test(message) && /\d/.test(message)) {
+    const amt = Number((message.match(/\$?\s*([\d,]+)/)?.[1] ?? "300").replace(/,/g, ""));
+    return {
+      message:
+        "I'll split this remittance across multiple Stellar destinations — each leg is its own Stellar payment with an intent memo, settled as stablecoin and delivered to mobile money as the last mile.",
+      actionCard: buildSplitPaymentCard({
+        total: amt,
+        currency: "USD",
+        items: [
+          { label: "Grace Mwila (Mum)", percentage: 60, memo: "FAMILY_SUPPORT_MOTHER", destination_type: "member" },
+          { label: "School fees vault", percentage: 20, memo: "SCHOOL_FEES", destination_type: "vault" },
+          { label: "Emergency vault", percentage: 10, memo: "EMERGENCY_RESERVE", destination_type: "vault" },
+          { label: "House fund vault", percentage: 10, memo: "HOUSE_FUND_DEPOSIT", destination_type: "vault" },
+        ],
+      }),
+      suggestedActions: [{ label: "Change split", action: "edit_split" }],
+    };
+  }
+
+  // 3. Create / set up family wallet
+  if (/family wallet|set up.*family|create.*family/i.test(message)) {
+    return {
+      message:
+        "Let's set up your Stellar Family Wallet. Each member gets a mapped Stellar destination and an intent memo, so support, school fees and emergencies are organised and traceable on-chain.",
+      actionCard: buildFamilyWalletCard({ name: "Mwila Family", base_currency: "ZMW" }),
+      suggestedActions: [{ label: "Add another member", action: "add_member" }],
+    };
+  }
+
+  // 4. Create a Stellar wallet
+  if (/(create|make|set up|open).*(stellar )?wallet/i.test(message)) {
+    return {
+      message:
+        "I'll create a real Stellar wallet for you. Your secret key is encrypted server-side and never shared — you'll get an XLM balance, a USDC trustline, and a public address you can view on Stellar Expert.",
+      actionCard: buildStellarWalletCard({ network: "testnet", fund: true }),
+    };
+  }
+
+  // 5. Goal vaults — house / education / emergency
+  if (/(build|buy).*(house|home)|house fund|education (fund|vault)|emergency (fund|vault)|retirement|create.*vault/i.test(message)) {
+    const isHouse = /house|home/i.test(message);
+    const isEdu = /educat|school|univers|college/i.test(message);
+    const isEmerg = /emergency/i.test(message);
+    const vault_type = isHouse ? "house" : isEdu ? "education" : isEmerg ? "emergency" : "general";
+    const name = isHouse
+      ? "Build a house in Lusaka"
+      : isEdu
+      ? "Education Fund"
+      : isEmerg
+      ? "Family Emergency Fund"
+      : "Savings Vault";
+    const target = isHouse ? 500000 : isEdu ? 120000 : isEmerg ? 30000 : 50000;
+    return {
+      message:
+        "Great goal. I'll create a Stellar Goal Vault for it — a Stellar-backed account that tracks your progress and accepts deposits tagged with an intent memo. Confirm to create it.",
+      actionCard: buildGoalVaultCard({
+        name,
+        vault_type: vault_type as "house" | "education" | "emergency" | "general",
+        target_amount: target,
+        currency: "ZMW",
+        monthly_contribution: Math.round(target / 100),
+      }),
+      suggestedActions: [{ label: "Save 10% of transfers here", action: "auto_save" }],
+    };
+  }
+
+  // 6. FX / convert when rate
+  if (/convert.*(when|reach|hit|above|better)|fx|exchange rate.*target|path payment/i.test(message)) {
+    const target = Number(message.match(/(\d{2}(?:\.\d+)?)/)?.[1] ?? "30");
+    return {
+      message:
+        "I'll watch the Stellar order book and convert via a path payment for the best route. Here's the FX rule — confirm to set it.",
+      actionCard: buildPathPaymentCard({
+        send_asset: "USD",
+        send_amount: 1000,
+        dest_asset: "ZMW",
+        target_rate: target,
+      }),
+      suggestedActions: [{ label: "Convert now instead", action: "convert_now" }],
+    };
+  }
+
+  return null;
+}
+
 /** Heuristic: parse a free-form "send X to Y" instruction into a transfer card. */
 function tryParseTransfer(message: string): ActionCard | null {
   const m = message.match(
@@ -226,6 +348,10 @@ export async function runAgent(
 ): Promise<AgentResponse> {
   // Demo mode — pattern-match curated responses
   if (!isAiConfigured) {
+    // Stellar-native intents take priority
+    const stellar = tryStellarIntent(userMessage);
+    if (stellar) return stellar;
+
     for (const demo of DEMO_RESPONSES) {
       if (demo.match.test(userMessage)) return demo.response;
     }
@@ -273,9 +399,11 @@ export async function runAgent(
   const result = await llm.invoke(messages);
   const content = typeof result.content === "string" ? result.content : JSON.stringify(result.content);
 
+  // Attach a structured, confirmable card when the message implies an action.
+  const stellar = tryStellarIntent(userMessage);
   return {
     message: content,
-    actionCard: tryParseTransfer(userMessage) ?? undefined,
+    actionCard: stellar?.actionCard ?? tryParseTransfer(userMessage) ?? undefined,
     suggestedActions: extractSuggestedActions(content),
   };
 }

@@ -20,6 +20,13 @@ import {
   Menu,
   Bell,
   ChevronLeft,
+  HeartHandshake,
+  Vault,
+  Split,
+  ArrowLeftRight,
+  ScrollText,
+  Sparkles,
+  FileCode,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -28,19 +35,43 @@ import { isDemoMode } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { demoUser } from "@/lib/demo-data";
 
-const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/ai", label: "Mosi Agent", icon: Bot, highlight: true },
-  { href: "/transfer", label: "Send Money", icon: Send },
-  { href: "/wallet", label: "Wallet", icon: Wallet },
-  { href: "/savings", label: "Savings", icon: PiggyBank },
-  { href: "/investments", label: "Investments", icon: TrendingUp },
-  { href: "/family", label: "Family", icon: Users },
-  { href: "/school-fees", label: "School Fees", icon: GraduationCap },
-  { href: "/bills", label: "Bills", icon: Receipt },
-  { href: "/automations", label: "Automations", icon: Repeat },
-  { href: "/business", label: "Business", icon: Building2 },
-  { href: "/admin", label: "Admin", icon: Shield },
+const navGroups: {
+  label?: string;
+  items: { href: string; label: string; icon: typeof LayoutDashboard; highlight?: boolean }[];
+}[] = [
+  {
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/ai", label: "Mosi Agent", icon: Bot, highlight: true },
+      { href: "/demo", label: "Demo Flow", icon: Sparkles, highlight: true },
+    ],
+  },
+  {
+    label: "Stellar",
+    items: [
+      { href: "/wallet", label: "Stellar Wallet", icon: Wallet },
+      { href: "/family-wallet", label: "Family Wallet", icon: HeartHandshake },
+      { href: "/goal-vaults", label: "Goal Vaults", icon: Vault },
+      { href: "/split-payments", label: "Split Payments", icon: Split },
+      { href: "/fx-optimizer", label: "FX Optimizer", icon: ArrowLeftRight },
+      { href: "/stellar-receipts", label: "Receipts", icon: ScrollText },
+      { href: "/smart-contracts", label: "Smart Contracts", icon: FileCode },
+      { href: "/automations", label: "Automations", icon: Repeat },
+    ],
+  },
+  {
+    label: "Money",
+    items: [
+      { href: "/transfer", label: "Send Money", icon: Send },
+      { href: "/savings", label: "Savings", icon: PiggyBank },
+      { href: "/investments", label: "Investments", icon: TrendingUp },
+      { href: "/family", label: "Family", icon: Users },
+      { href: "/school-fees", label: "School Fees", icon: GraduationCap },
+      { href: "/bills", label: "Bills", icon: Receipt },
+      { href: "/business", label: "Business", icon: Building2 },
+      { href: "/admin", label: "Admin", icon: Shield },
+    ],
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -66,30 +97,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {nav.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                active
-                  ? item.highlight
-                    ? "bg-gradient-to-r from-gold/20 to-gold/5 text-gold"
-                    : "bg-white/[0.06] text-foreground"
-                  : "text-muted hover:bg-white/[0.04] hover:text-foreground",
-                collapsed && "justify-center px-2"
-              )}
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon className={cn("size-[18px] shrink-0", item.highlight && active && "text-gold")} />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-2">
+        {navGroups.map((group, gi) => (
+          <div key={group.label ?? gi} className="space-y-1">
+            {group.label && !collapsed && (
+              <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted/70">
+                {group.label}
+              </p>
+            )}
+            {group.items.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                    active
+                      ? item.highlight
+                        ? "bg-gradient-to-r from-gold/20 to-gold/5 text-gold"
+                        : "bg-white/[0.06] text-foreground"
+                      : "text-muted hover:bg-white/[0.04] hover:text-foreground",
+                    collapsed && "justify-center px-2"
+                  )}
+                  title={collapsed ? item.label : undefined}
+                >
+                  <item.icon className={cn("size-[18px] shrink-0", item.highlight && active && "text-gold")} />
+                  {!collapsed && <span>{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="border-t border-border p-3">
