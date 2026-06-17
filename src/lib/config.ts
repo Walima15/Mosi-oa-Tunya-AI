@@ -1,9 +1,23 @@
 /** Runtime configuration + feature detection. */
 
+function readSupabaseAnonKey(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
+
+function readSupabaseServiceKey(): string | undefined {
+  return (
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
 export const env = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  supabaseAnonKey: readSupabaseAnonKey(),
+  supabaseServiceKey: readSupabaseServiceKey(),
   openaiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o",
   stellarNetwork: process.env.STELLAR_NETWORK ?? "testnet",

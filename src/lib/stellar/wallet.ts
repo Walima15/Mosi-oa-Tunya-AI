@@ -23,6 +23,7 @@ const ALGO = "aes-256-gcm";
 function encryptionKey(): Buffer {
   const raw =
     process.env.STELLAR_ENCRYPTION_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "mosi-oa-tunya-demo-encryption-key-please-change";
   return crypto.createHash("sha256").update(raw).digest();

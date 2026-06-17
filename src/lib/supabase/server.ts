@@ -26,8 +26,12 @@ export async function createClient() {
 
 /** Privileged client for trusted server jobs (settlement, webhooks, cron). */
 export function createServiceClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
+  const key = env.supabaseServiceKey;
+  if (!key) {
+    throw new Error(
+      "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is not set"
+    );
+  }
   return createServerClient(env.supabaseUrl!, key, {
     cookies: { getAll: () => [], setAll: () => {} },
   });
