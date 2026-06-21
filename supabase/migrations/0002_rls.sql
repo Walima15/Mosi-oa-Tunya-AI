@@ -1,8 +1,8 @@
--- ════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════════════════
 -- Mosi-oa-Tunya AI — Row Level Security
 -- Every user can only touch their own rows. Admins get read/manage access
 -- via the is_admin() helper. Service role bypasses RLS for server jobs.
--- ════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════════════════
 
 -- Helper: is the current user an admin?
 create or replace function is_admin()
@@ -100,4 +100,5 @@ create policy "payroll by org owner" on payroll_runs
 create policy "audit own or admin" on audit_logs for select
   using (user_id = auth.uid() or is_admin());
 create policy "risk admin" on risk_flags for all
-  using (is_admin() or user_id = auth.uid());
+  using (is_admin() or user_id = auth.uid())
+  with check (is_admin() or user_id = auth.uid());

@@ -1,7 +1,7 @@
--- ════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════════════════
 -- Mosi-oa-Tunya AI — Security helper functions, audit logging & bill payments
 -- Adds the helpers referenced by the product spec and a bill_payments ledger.
--- ════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────
 -- Role / ownership helper functions (used by RLS + server code)
@@ -82,7 +82,7 @@ alter table bill_payments enable row level security;
 
 create policy "owner bill_payments" on bill_payments
   for all using (user_id = auth.uid() or is_admin())
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() or is_admin());
 
 -- ─────────────────────────────────────────────
 -- Audit triggers: log transaction lifecycle changes automatically
