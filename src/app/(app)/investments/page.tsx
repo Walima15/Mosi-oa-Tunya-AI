@@ -2,18 +2,20 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { demoInvestments } from "@/lib/demo-data";
+import { getInvestments } from "@/lib/data/queries";
 import { formatMoney } from "@/lib/utils";
+import type { RiskProfile } from "@/lib/types";
 
-const riskColors = {
-  conservative: "success" as const,
-  balanced: "cyan" as const,
-  growth: "gold" as const,
-  aggressive: "danger" as const,
+const riskColors: Record<RiskProfile, "success" | "cyan" | "gold" | "danger"> = {
+  conservative: "success",
+  balanced: "cyan",
+  growth: "gold",
+  aggressive: "danger",
 };
 
-export default function InvestmentsPage() {
-  const portfolio = demoInvestments.filter((i) => i.held);
+export default async function InvestmentsPage() {
+  const products = await getInvestments();
+  const portfolio = products.filter((i) => i.held);
   const totalValue = portfolio.reduce((s, i) => s + (i.value ?? 0), 0);
   const totalInvested = portfolio.reduce((s, i) => s + (i.held ?? 0), 0);
   const roi = totalInvested > 0 ? (((totalValue - totalInvested) / totalInvested) * 100).toFixed(1) : "0";
@@ -32,36 +34,44 @@ export default function InvestmentsPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {demoInvestments.map((p) => (
-          <Card key={p.id}>
-            <CardHeader>
-              <CardTitle className="text-base">{p.name}</CardTitle>
-              <Badge variant={riskColors[p.risk]}>{p.risk}</Badge>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted">{p.description}</p>
-              <div className="mt-4 flex flex-wrap gap-4 text-xs">
-                <span>ROI: <strong className="text-success">{p.expected_roi}%</strong>/yr</span>
-                <span>Min: {formatMoney(p.min_amount, p.currency)}</span>
-                {p.term_months && <span>Term: {p.term_months}mo</span>}
-              </div>
-              {p.held && p.value && (
-                <div className="mt-4">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted">Your holding</span>
-                    <span>{formatMoney(p.value, p.currency)}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-success">
-                    +{formatMoney(p.value - p.held, p.currency)} gain
-                  </p>
+      {products.length === 0 ? (
+        <Card className="p-10 text-center">
+          <p className="font-semibold">No investment products available</p>
+          <p className="mt-1 text-sm text-muted">Check back soon — products will appear here once published.</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {products.map((p) => (
+            <Card key={p.id}>
+              <CardHeader>
+                <CardTitle className="text-base">{p.name}</CardTitle>
+                <Badge variant={riskColors[p.risk]}>{p.risk}</Badge>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted">{p.description}</p>
+                <div className="mt-4 flex flex-wrap gap-4 text-xs">
+                  <span>ROI: <strong className="text-success">{p.expected_roi}%</strong>/yr</span>
+                  <span>Min: {formatMoney(p.min_amount, p.currency)}</span>
+                  {p.term_months && <span>Term: {p.term_months}mo</span>}
                 </div>
-              )}
-              {!p.held && <Button size="sm" className="mt-4" variant="secondary">Invest</Button>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                {p.held && p.value ? (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted">Your holding</span>
+                      <span>{formatMoney(p.value, p.currency)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-success">
+                      +{formatMoney(p.value - p.held, p.currency)} gain
+                    </p>
+                  </div>
+                ) : (
+                  <Button size="sm" className="mt-4" variant="secondary">Invest</Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

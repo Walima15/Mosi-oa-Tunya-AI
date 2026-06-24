@@ -416,21 +416,25 @@ create trigger trg_ai_mem_updated before update on ai_memories
 -- New user → profile bootstrap
 -- ─────────────────────────────────────────────
 create or replace function handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
   insert into public.profiles (id, full_name, email, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
     new.email,
-    coalesce((new.raw_user_meta_data->>'role')::user_role, 'diaspora')
+    coalesce((new.raw_user_meta_data->>'role')::public.user_role, 'diaspora'::public.user_role)
   );
   -- create a primary ZMW wallet
   insert into public.wallets (user_id, type, currency, is_primary)
   values (new.id, 'fiat', 'ZMW', true);
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create trigger on_auth_user_created
   after insert on auth.users

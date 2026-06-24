@@ -66,11 +66,15 @@ create index if not exists idx_bill_payments_user on bill_payments(user_id, crea
 -- BUSINESSES / PAYROLL BATCHES — spec-named views over existing tables
 -- (organizations + payroll_runs) so either naming convention works.
 -- ─────────────────────────────────────────────
-create or replace view businesses as
+-- security_invoker so the views respect the querying user's RLS, not the
+-- creator's (postgres) — otherwise they would bypass row level security.
+create or replace view businesses
+  with (security_invoker = true) as
   select id, owner_id, name, country, base_currency, created_at
   from organizations;
 
-create or replace view payroll_batches as
+create or replace view payroll_batches
+  with (security_invoker = true) as
   select id, organization_id, period, total_amount, status, employee_count,
          created_at, executed_at
   from payroll_runs;

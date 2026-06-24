@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { executeSplit } from "@/lib/services/split";
+import { getUserId } from "@/lib/data/user";
+import { isSupabaseConfigured } from "@/lib/config";
 
 export const runtime = "nodejs";
 
@@ -24,9 +26,13 @@ const schema = z.object({
 /** Execute a Stellar split payment — fan a remittance to many destinations. */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getUserId();
+    if (isSupabaseConfigured && !userId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     const data = schema.parse(await req.json());
     const result = await executeSplit({
-      userId: "demo-user",
+      userId: userId ?? "demo-user",
       total: data.total,
       currency: data.currency,
       items: data.items.map((it) => ({

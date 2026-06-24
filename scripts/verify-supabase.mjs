@@ -43,7 +43,9 @@ if (!key) {
   process.exit(1);
 }
 
-const res = await fetch(`${url}/rest/v1/`, {
+// Probe a real table rather than the bare PostgREST root: the root endpoint
+// returns 401 for modern sb_publishable_ keys even when the key is valid.
+const res = await fetch(`${url}/rest/v1/exchange_rates?select=base&limit=1`, {
   headers: { apikey: key, Authorization: `Bearer ${key}` },
 });
 

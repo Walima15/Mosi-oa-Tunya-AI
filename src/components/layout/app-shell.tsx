@@ -31,9 +31,14 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { DemoBadge } from "@/components/layout/demo-badge";
-import { isDemoMode } from "@/lib/config";
 import { cn } from "@/lib/utils";
-import { demoUser } from "@/lib/demo-data";
+import type { UserRole, KycStatus } from "@/lib/types";
+
+interface AppShellUser {
+  full_name: string;
+  role: UserRole;
+  kyc_status: KycStatus;
+}
 
 const navGroups: {
   label?: string;
@@ -74,8 +79,18 @@ const navGroups: {
   },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  user,
+  demo,
+}: {
+  children: React.ReactNode;
+  user: AppShellUser;
+  demo: boolean;
+}) {
   const pathname = usePathname();
+  const roleLabel = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+  const kycLabel = user.kyc_status.charAt(0).toUpperCase() + user.kyc_status.slice(1);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -169,16 +184,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className="hidden lg:block" />
           <div className="flex items-center gap-3">
-            {isDemoMode && <DemoBadge className="hidden sm:inline-flex" />}
+            {demo && <DemoBadge className="hidden sm:inline-flex" />}
             <button className="relative rounded-full p-2 text-muted hover:bg-white/5 hover:text-foreground">
               <Bell className="size-5" />
               <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-cyan-accent" />
             </button>
             <div className="flex items-center gap-2.5">
-              <Avatar name={demoUser.full_name} size={32} />
+              <Avatar name={user.full_name} size={32} />
               <div className="hidden sm:block">
-                <p className="text-sm font-medium leading-none">{demoUser.full_name}</p>
-                <p className="text-[11px] text-muted">Diaspora · Verified</p>
+                <p className="text-sm font-medium leading-none">{user.full_name}</p>
+                <p className="text-[11px] text-muted">{roleLabel} · {kycLabel}</p>
               </div>
             </div>
           </div>

@@ -57,7 +57,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'kyc_documents','wallets','beneficiaries','transactions','automations',
+    'kyc_documents','wallets','transactions','automations',
     'exchange_alerts','savings_goals','investments','school_fees','bills',
     'ai_conversations','ai_memories','notifications','devices'
   ]
@@ -69,6 +69,11 @@ begin
     $f$, t);
   end loop;
 end $$;
+
+-- beneficiaries is keyed by owner_id (not user_id)
+create policy "owner all" on beneficiaries
+  for all using (owner_id = auth.uid() or is_admin())
+  with check (owner_id = auth.uid());
 
 -- ai_messages: scoped by user_id too
 create policy "owner messages" on ai_messages

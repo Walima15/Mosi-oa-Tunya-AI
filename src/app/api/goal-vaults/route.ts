@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createGoalVault, depositToVault, forecastVault } from "@/lib/services/vault";
 import { GoalVault } from "@/lib/stellar/contracts";
 import { explorerAccountUrl } from "@/lib/stellar/explorer";
+import { getUserId } from "@/lib/data/user";
+import { isSupabaseConfigured } from "@/lib/config";
 import type { VaultType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -21,10 +23,14 @@ const schema = z.object({
 /** Create a Soroban Goal Vault (USDC) with optional opening deposit. */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getUserId();
+    if (isSupabaseConfigured && !userId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     const data = schema.parse(await req.json());
 
     const created = await createGoalVault({
-      userId: "demo-user",
+      userId: userId ?? "demo-user",
       vaultName: data.name,
       vaultType: data.vault_type as VaultType,
       targetAmount: data.target_amount,
@@ -34,7 +40,7 @@ export async function POST(req: NextRequest) {
     let deposit = null;
     if (data.initial_deposit && data.initial_deposit > 0) {
       deposit = await depositToVault({
-        userId: "demo-user",
+        userId: userId ?? "demo-user",
         vaultName: data.name,
         vaultType: data.vault_type as VaultType,
         vaultAccount: created.stellarPublicKey,
